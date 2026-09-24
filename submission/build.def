@@ -1,0 +1,66 @@
+Bootstrap: docker
+From: quay.io/ascend/vllm-ascend@sha256:7265a3a08bba26b9376a4d577015ac8d459675fb3c1eec89aef6d9a19ac219d9
+
+%environment
+    export PYTHONUNBUFFERED=1
+    export HF_HUB_OFFLINE=1
+    export TRANSFORMERS_OFFLINE=1
+
+%post
+    set -eu
+    # Allow the unprivileged outer runner to clean up after a failed build.
+    find /usr/local/Ascend -type d ! -perm -u+w -exec chmod u+w {} +
+    # Preserve the pinned image's precompiled A2 kernels while updating Python sources.
+    fetch_source() {
+        source_dir="$1"
+        repository="$2"
+        git -C "$source_dir" remote set-url origin "$repository"
+        git -C "$source_dir" config remote.origin.fetch '+refs/heads/*:refs/remotes/origin/*'
+        git -C "$source_dir" fetch --depth 1 origin \
+            refs/heads/hpc_dev:refs/remotes/origin/hpc_dev
+        git -C "$source_dir" checkout -b hpc_dev --track origin/hpc_dev
+    }
+    fetch_source /vllm-workspace/vllm https://github.com/vhagor/vllm.git
+    fetch_source /vllm-workspace/vllm-ascend https://github.com/vhagor/vllm-ascend.git
+
+    # Empty backend avoids CUDA compilation; Ascend uses the retained native artifacts.
+    # Keep the tested dependency stack instead of resolving new PyTorch/CANN versions.
+    python3 -m pip install --no-deps setuptools-rust==1.12.0 semantic-version==2.10.0
+    export TORCH_DEVICE_BACKEND_AUTOLOAD=0
+    VLLM_TARGET_DEVICE=empty SETUPTOOLS_SCM_PRETEND_VERSION=0.26.0 \
+        python3 -m pip install --no-deps --no-build-isolation -e /vllm-workspace/vllm
+    COMPILE_CUSTOM_KERNELS=0 SOC_VERSION=ascend910b1 SETUPTOOLS_SCM_PRETEND_VERSION=0.26.0rc1 \
+        python3 -m pip install --no-deps --no-build-isolation -e /vllm-workspace/vllm-ascend
+    # Respect the writable runtime config directory used by start.sh.
+    python3 - <<'PY'
+from pathlib import Path
+
+path = Path("/vllm-workspace/vllm-ascend/vllm_ascend/profiling_config.py")
+old = '    home_dir = Path.home()\n    config_dir = home_dir / ".config" / "vllm_ascend"'
+new = ('    import os\n'
+       '    config_root = os.environ.get("XDG_CONFIG_HOME")\n'
+       '    config_dir = (Path(config_root) if config_root else Path.home() / ".config") / "vllm_ascend"')
+path.write_text(path.read_text().replace(old, new))
+PY
+    mkdir -p /opt/inference
+    python3 -m pip freeze > /opt/inference/requirements.freeze.txt
+
+%test
+    set -eu
+    command -v python3
+    # Build containers have no NPU driver bind; check metadata without loading it.
+    python3 - <<'PY'
+from importlib.metadata import version
+
+expected = {
+    "vllm": "0.26.0",
+    "vllm-ascend": "0.26.0rc1",
+    "torch": "2.10.0",
+    "torch-npu": "2.10.0.post4",
+    "triton-ascend": "3.2.2",
+}
+for package, required in expected.items():
+    installed = version(package)
+    print(f"{package}={installed}")
+    assert installed.split("+")[0] == required, (package, installed, required)
+PY

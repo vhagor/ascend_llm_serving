@@ -1,0 +1,8 @@
+[submodule "frameworks/vllm"]
+	path = frameworks/vllm
+	url = https://github.com/vhagor/vllm.git
+	branch = hpc_dev
+[submodule "frameworks/vllm-ascend"]
+	path = frameworks/vllm-ascend
+	url = https://github.com/vhagor/vllm-ascend.git
+	branch = hpc_dev
