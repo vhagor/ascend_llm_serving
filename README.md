@@ -118,7 +118,7 @@ Stage2 共用 **4800 秒（80 分钟）**总预算，包含启动、就绪检查
 令归一化吞吐为：
 
 $$
-u = \operatorname{clamp}\left(\frac{P - P_0}{P_f - P_0},\, 0,\, 1\right)
+u = \min\left(1, \max\left(0, \frac{P - P_0}{P_f - P_0}\right)\right)
 $$
 
 通过下述门槛后：

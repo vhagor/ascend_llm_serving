@@ -25,7 +25,7 @@ deepseek_config=$(cat <<'DEEPSEEK_CONFIG'
   "data-parallel-size": 1,
   "dtype": "bfloat16",
   "max-model-len": 102400,
-  "max-num-seqs": 20,
+  "max-num-seqs": 32,
   "max-num-batched-tokens": 8192,
   "gpu-memory-utilization": 0.9,
   "quantization": "ascend",
@@ -81,7 +81,9 @@ export XDG_CACHE_HOME="${TMPDIR:-/tmp}/xdg-cache"
 export HF_HOME="${TMPDIR:-/tmp}/huggingface"
 export TORCH_HOME="${TMPDIR:-/tmp}/torch-cache"
 export ASCEND_WORK_PATH="${TMPDIR:-/tmp}/ascend-work"
-mkdir -p "$XDG_CONFIG_HOME" "$VLLM_CONFIG_ROOT" "$VLLM_CACHE_ROOT" "$TRITON_CACHE_DIR" "$XDG_CACHE_HOME" "$HF_HOME" "$TORCH_HOME" "$ASCEND_WORK_PATH"
+export ASCEND_CACHE_PATH="$runtime_dir/ascend-cache"
+export TEST_DATA_ROOT_PATH="$runtime_dir/tvm-test-data"
+mkdir -p "$XDG_CONFIG_HOME" "$VLLM_CONFIG_ROOT" "$VLLM_CACHE_ROOT" "$TRITON_CACHE_DIR" "$XDG_CACHE_HOME" "$HF_HOME" "$TORCH_HOME" "$ASCEND_WORK_PATH" "$ASCEND_CACHE_PATH"
 
 # Preserve runtime visibility, including an explicitly empty device list.
 # Only translate physical IDs when the platform supplies no runtime visibility.
