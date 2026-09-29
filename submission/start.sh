@@ -25,15 +25,31 @@ deepseek_config=$(cat <<'DEEPSEEK_CONFIG'
   "data-parallel-size": 1,
   "dtype": "bfloat16",
   "max-model-len": 102400,
-  "max-num-seqs": 32,
-  "max-num-batched-tokens": 8192,
-  "gpu-memory-utilization": 0.9,
+  "max-num-seqs": 24,
+  "max-num-batched-tokens": 16384,
+  "scheduler-reserve-full-isl": false,
+  "gpu-memory-utilization": 0.92,
   "quantization": "ascend",
   "enable-expert-parallel": true,
   "tokenizer-mode": "deepseek_v4",
-  "block-size": 128,
+  "block-size": 32,
+  "speculative-config": {
+    "method": "dspark",
+    "num_speculative_tokens": 5,
+    "use_local_argmax_reduction": true
+  },
+  "compilation-config": {
+    "cudagraph_mode": "FULL_DECODE_ONLY"
+  },
   "additional-config": {
     "enable_cpu_binding": false,
+    "enable_flashcomm1": false,
+    "enable_shared_expert_dp": true,
+    "multistream_overlap_shared_expert": true,
+    "ascend_compilation_config": {
+      "enable_npugraph_ex": true,
+      "enable_static_kernel": false
+    },
     "ascend_log_path": "/tmp/vllm-ascend-logs"
   }
 }
@@ -67,6 +83,11 @@ export HF_HUB_OFFLINE=1
 export TRANSFORMERS_OFFLINE=1
 export PYTHONUNBUFFERED=1
 export OMP_NUM_THREADS=8
+if [[ "$profile" == deepseek ]]; then
+    export HCCL_OP_EXPANSION_MODE=AIV
+    export HCCL_BUFFSIZE=1024
+    export VLLM_PREFIX_CACHE_RETENTION_INTERVAL=4096
+fi
 # Prefer local temporary storage; use the platform's temporary directory if unavailable.
 if ! runtime_dir=$(mktemp -d /var/tmp/inference-runtime.XXXXXX); then
     runtime_dir=$(mktemp -d "${TMPDIR:-/tmp}/inference-runtime.XXXXXX")
